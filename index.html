@@ -159,38 +159,39 @@
      Tabs (shared) + Pebblepack (Play tab). Everything game-side is pp-.
      ===================================================================== */
   :root {
-    --pp-ground: #eceffb;
-    --pp-card: #ffffff;
-    --pp-ink: #161a3a;
-    --pp-ink-soft: #545a85;
-    --pp-line: #d3d8f0;
+    --pp-ground: #ecebe7;
+    --pp-card: #fbfaf7;
+    --pp-ink: #26211b;
+    --pp-ink-soft: #6b6257;
+    --pp-line: #d9d3c9;
     --pp-accent: #ff9f1c;
     --pp-accent-ink: #1a1200;
-    --pp-slate: #1c2366;
-    --pp-slate-hi: #2b3590;
-    --pp-well: #121852;
+    --pp-wood: #c98b4f;
+    --pp-wood-hi: #dfa96d;
+    --pp-grain: 110, 55, 20;          /* rgb of the grain lines and knots */
+    --pp-well: #74431f;
     --pp-display: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Varela Round", "Nunito", system-ui, sans-serif;
     --pp-body: system-ui, "Segoe UI", -apple-system, sans-serif;
     --pp-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --pp-ground: #0d1030;
-      --pp-card: #171c45;
-      --pp-ink: #eef0ff;
-      --pp-ink-soft: #a4aad6;
-      --pp-line: #2a3170;
+      --pp-ground: #1a1613;
+      --pp-card: #25201b;
+      --pp-ink: #f2ede6;
+      --pp-ink-soft: #b2a798;
+      --pp-line: #3a322a;
       --pp-accent: #ffb341;
       --pp-accent-ink: #1a1200;
     }
   }
   :root[data-theme="dark"] {
-    --pp-ground: #0d1030; --pp-card: #171c45; --pp-ink: #eef0ff; --pp-ink-soft: #a4aad6;
-    --pp-line: #2a3170; --pp-accent: #ffb341; --pp-accent-ink: #1a1200;
+    --pp-ground: #1a1613; --pp-card: #25201b; --pp-ink: #f2ede6; --pp-ink-soft: #b2a798;
+    --pp-line: #3a322a; --pp-accent: #ffb341; --pp-accent-ink: #1a1200;
   }
   :root[data-theme="light"] {
-    --pp-ground: #eceffb; --pp-card: #ffffff; --pp-ink: #161a3a; --pp-ink-soft: #545a85;
-    --pp-line: #d3d8f0; --pp-accent: #ff9f1c; --pp-accent-ink: #1a1200;
+    --pp-ground: #ecebe7; --pp-card: #fbfaf7; --pp-ink: #26211b; --pp-ink-soft: #6b6257;
+    --pp-line: #d9d3c9; --pp-accent: #ff9f1c; --pp-accent-ink: #1a1200;
   }
 
   body[data-tab="play"] { background: var(--pp-ground); color: var(--pp-ink); font-family: var(--pp-body); }
@@ -250,17 +251,25 @@
   /* ---- Slate board ---- */
   .pp-slate {
     --gap: clamp(3px, 1.1vw, 8px);
+    /* Wood: a soft sheen, two knots, long grain lines, then the base tone. */
     background:
-      radial-gradient(120% 90% at 15% 0%, rgba(120,140,255,.35), transparent 55%),
-      radial-gradient(90% 80% at 100% 100%, rgba(214,58,216,.22), transparent 60%),
-      linear-gradient(160deg, var(--pp-slate-hi), var(--pp-slate));
+      linear-gradient(180deg, rgba(255,240,210,.28), transparent 35%, rgba(60,25,0,.12)),
+      radial-gradient(ellipse 9% 5% at 71% 37%, rgba(var(--pp-grain), .45), rgba(var(--pp-grain), .12) 60%, transparent 75%),
+      radial-gradient(ellipse 16% 8% at 71% 37%, transparent 55%, rgba(var(--pp-grain), .14) 62%, transparent 74%),
+      radial-gradient(ellipse 6% 3.5% at 18% 78%, rgba(var(--pp-grain), .35), transparent 75%),
+      repeating-linear-gradient(178.6deg,
+        rgba(var(--pp-grain), .10) 0 1px, transparent 1px 6px,
+        rgba(var(--pp-grain), .06) 6px 8px, transparent 8px 13px,
+        rgba(var(--pp-grain), .13) 13px 14px, transparent 14px 23px),
+      repeating-linear-gradient(181.2deg, rgba(255,230,190,.07) 0 3px, transparent 3px 17px),
+      linear-gradient(180deg, var(--pp-wood-hi), var(--pp-wood));
     border-radius: 14px;
     padding: clamp(10px, 2.6vw, 18px);
     box-shadow:
-      inset 0 0 0 1px rgba(255,255,255,.06),
-      inset 0 -3px 0 rgba(0,0,0,.25),
-      0 1px 0 rgba(255,255,255,.4),
-      0 14px 28px -12px rgba(10,20,25,.55);
+      inset 0 1px 0 rgba(255,235,200,.55),
+      inset 0 -4px 0 rgba(90,45,10,.35),
+      inset 0 0 0 1px rgba(90,45,10,.35),
+      0 16px 30px -14px rgba(60,30,5,.6);
   }
   .pp-board {
     display: grid;
@@ -271,9 +280,9 @@
     position: relative;               /* no z-index: stones and joins share the board's stacking context */
     aspect-ratio: 1;
     border: none; padding: 0; margin: 0;
-    background: var(--pp-well);
+    background: radial-gradient(120% 120% at 50% 30%, color-mix(in srgb, var(--pp-well) 80%, black), var(--pp-well));
     border-radius: 30%;
-    box-shadow: inset 0 2px 3px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.05);
+    box-shadow: inset 0 3px 4px rgba(40,15,0,.55), inset 0 -1px 0 rgba(255,225,180,.35), 0 1px 0 rgba(255,230,190,.35);
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -290,7 +299,7 @@
       radial-gradient(60% 45% at 34% 24%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 45%, transparent 72%),
       radial-gradient(130% 120% at 45% 35%, color-mix(in srgb, var(--c) 80%, white) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 58%, black) 100%);
     box-shadow:
-      0 3px 4px rgba(5,8,40,.45),
+      0 3px 4px rgba(45,20,0,.5),
       inset 0 -3px 5px color-mix(in srgb, var(--c) 50%, black),
       0 0 10px -2px color-mix(in srgb, var(--c) 70%, transparent);
   }
@@ -305,7 +314,7 @@
     content: "";
     position: absolute;
     z-index: 0;
-    background: color-mix(in srgb, var(--c) 72%, #0b0f3a);
+    background: color-mix(in srgb, var(--c) 70%, #2a1405);
     border-radius: 3px;
   }
   .pp-cell.jr::before { left: 50%; top: 33%; height: 34%; width: calc(100% + var(--gap)); }
