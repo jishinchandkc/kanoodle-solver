@@ -108,6 +108,83 @@
     };
   } catch (err) { worker = null; }
 
+  /* =====================================================================
+     Clock: starts on the first move, pauses while the page is hidden,
+     stops for good when the puzzle is solved.
+     ===================================================================== */
+  const clock = { elapsed: 0, since: null, done: false };
+  const elapsed = () => clock.elapsed + (clock.since ? Date.now() - clock.since : 0);
+  function startClock() { if (!clock.done && !clock.since) { clock.since = Date.now(); showTime(); } }
+  function pauseClock() { if (clock.since) { clock.elapsed = elapsed(); clock.since = null; } }
+  function stopClock() { pauseClock(); clock.done = true; }
+  function fmt(ms) {
+    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+  }
+  function showTime() { $('pp-time').textContent = fmt(elapsed()); }
+  let ticks = 0;
+  setInterval(() => {
+    if (!clock.since) return;
+    showTime();
+    if (++ticks % 20 === 0) save();    // every ~5s, in case a phone closes the tab without warning
+  }, 250);
+
+  let pausedByHiding = false;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { pausedByHiding = !!clock.since; pauseClock(); save(); }
+    else if (pausedByHiding) { pausedByHiding = false; startClock(); }
+  });
+  window.addEventListener('pagehide', () => save());
+
+  /* =====================================================================
+     Saved on this device: best times, and the puzzle in progress.
+     Storage can be blocked (private mode, strict settings); the game then
+     just plays without remembering.
+     ===================================================================== */
+  const BEST_KEY = 'pebblepack.best.v1', GAME_KEY = 'pebblepack.game.v1';
+  function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (err) { return null; } }
+  function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* not saved */ } }
+  const bestFor = count => (load(BEST_KEY) || {})[count] ?? null;
+  function recordBest(count, ms) {
+    const all = load(BEST_KEY) || {};
+    const prev = all[count] ?? null;
+    if (prev === null || ms < prev) { all[count] = ms; store(BEST_KEY, all); }
+    return prev;
+  }
+
+  function save() {
+    if (!puzzle) return;
+    store(GAME_KEY, {
+      v: 1,
+      start: puzzle.start, solution: puzzle.solution, startCount: puzzle.startCount,
+      placed: [...placed], orient, history: history.map(m => [...m]),
+      hintsUsed, elapsed: elapsed(), done: clock.done,
+    });
+  }
+
+  // Put back a saved, unfinished puzzle. Returns false if there's nothing usable to restore.
+  function restore() {
+    const s = load(GAME_KEY);
+    if (!s || s.v !== 1 || s.done) return false;
+    const okBoard = b => Array.isArray(b) && b.length === N && b.every(x => x === null || LETTERS.includes(x));
+    if (!okBoard(s.start) || !okBoard(s.solution) || !Array.isArray(s.placed)) return false;
+    const taken = s.start.slice();
+    for (const [l, idxs] of s.placed) {
+      if (!LETTERS.includes(l) || taken.includes(l) || !Array.isArray(idxs)) return false;
+      for (const i of idxs) { if (!(i >= 0 && i < N) || taken[i]) return false; taken[i] = l; }
+    }
+    if (Engine.invalidPieces(taken).length) return false;
+    puzzle = { start: s.start, solution: s.solution, startCount: s.startCount };
+    placed = new Map(s.placed);
+    history = (s.history || []).map(m => new Map(m));
+    orient = Object.fromEntries(LETTERS.map(l => [l, Array.isArray(s.orient?.[l]) ? s.orient[l] : normalize(PIECES[l].cells)]));
+    hintsUsed = s.hintsUsed | 0;
+    clock.elapsed = +s.elapsed || 0; clock.since = null; clock.done = false;
+    selected = null; ghost = null; winShown = false; boardVersion++;
+    startInput.value = puzzle.startCount; $('pp-startval').textContent = puzzle.startCount;
+    return true;
+  }
+
   function ask(op, board, preferred) {
     if (!worker) return Promise.resolve(runHere(op, board, preferred));
     return new Promise(resolve => {
@@ -164,6 +241,7 @@
   const isFull = () => occupancy().every(Boolean);
 
   function place(letter, idxs, how) {
+    startClock();
     snapshot();
     placed.set(letter, idxs.slice().sort((a, b) => a - b));
     orient[letter] = normalize(idxs.map(rcOf));
@@ -176,6 +254,7 @@
   }
 
   function liftToTray(letter, msg) {
+    startClock();
     snapshot();
     const idxs = placed.get(letter);
     placed.delete(letter);
@@ -208,6 +287,7 @@
   async function runHint() {
     if (busy) return;
     if (isFull()) { say('The board is already full.'); return; }
+    startClock();
     const v = boardVersion;
     setBusy(true, 'Finding a hint…');
     const h = await ask('hint', occupancy(), puzzle.solution);
@@ -227,6 +307,7 @@
   async function runCheck() {
     if (busy) return;
     if (isFull()) { say('Solved already. Every stone is in.'); return; }
+    startClock();
     const v = boardVersion;
     setBusy(true, 'Checking…');
     const r = await ask('check', occupancy());
@@ -237,9 +318,28 @@
   }
 
   function win() {
+    if (clock.done) {                 // solved before, then undone and finished again: no second record
+      winShown = true;
+      say('');
+      cheer();
+      return;
+    }
+    stopClock();
+    showTime();
     winShown = true;
-    const h = hintsUsed;
-    $('pp-winline').textContent = h === 0 ? 'Solved without any hints.' : `Solved with ${h} hint${h === 1 ? '' : 's'}.`;
+    const ms = elapsed(), h = hintsUsed, k = puzzle.startCount;
+    $('pp-winline').textContent = `Time ${fmt(ms)} · ` + (h === 0 ? 'no hints.' : `${h} hint${h === 1 ? '' : 's'}.`);
+    let bestLine;
+    if (h > 0) {
+      const b = bestFor(k);
+      bestLine = `Solves with hints don't count toward your best${b !== null ? ` (${fmt(b)} with ${k} starting stones)` : ''}.`;
+    } else {
+      const prev = recordBest(k, ms);
+      bestLine = prev === null ? `First solve with ${k} starting stones. That's your best to beat.`
+        : ms < prev ? `New best with ${k} starting stones! (was ${fmt(prev)})`
+        : `Your best with ${k} starting stones: ${fmt(prev)}.`;
+    }
+    $('pp-winbest').textContent = bestLine;
     say('');
     cheer();
   }
@@ -286,6 +386,8 @@
     hintsUsed = 0;
     winShown = false;
     boardVersion++;
+    clock.elapsed = 0; clock.since = null; clock.done = false;
+    showTime();
     say('Drag a stone onto the board, or tap one and then tap where it goes.');
     render();
     popIn();
@@ -370,6 +472,10 @@
     $('pp-check').disabled = busy || full;
     $('pp-win').hidden = !(full && winShown);
     statusEl.hidden = full && winShown;              // the card takes the message line's place
+    const best = bestFor(puzzle.startCount);
+    $('pp-best').textContent = best === null ? '–' : fmt(best);
+    $('pp-best').parentElement.title = `Your best time with ${puzzle.startCount} starting stones, without hints`;
+    save();
   }
 
   // Stones bounce in, sweeping left to right, whenever a new puzzle appears.
@@ -570,5 +676,13 @@
     }
   });
 
-  newPuzzle();
+  if (restore()) {
+    render();
+    showTime();
+    say(placed.size ? 'Welcome back. Your puzzle is where you left it; the clock restarts on your next move.'
+                    : 'Welcome back. Your puzzle is ready when you are.');
+    popIn();
+  } else {
+    newPuzzle();
+  }
 })();

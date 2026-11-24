@@ -262,6 +262,8 @@
   .pp-wintitle { margin: 0; font-family: var(--pp-display); font-size: 26px; font-weight: 800; line-height: 1.1; }
   .pp-winline { margin: 4px 0 0; color: var(--pp-ink-soft); font-size: 15px; }
   .pp-win .pp-row { flex: 0 1 auto; }
+  .pp-winbest { margin-top: 2px; color: var(--pp-ink); font-weight: 600; }
+  .pp-winbest:empty { display: none; }
 
   @media (prefers-reduced-motion: no-preference) {
     /* Win: every stone hops in a wave from left to right. */
@@ -302,6 +304,7 @@
     </div>
     <div class="pp-stats">
       <div>Time<b id="pp-time">0:00</b></div>
+      <div>Best<b id="pp-best">–</b></div>
       <div>Stones<b id="pp-count">0/12</b></div>
     </div>
   </div>
@@ -312,6 +315,7 @@
     <div>
       <p class="pp-wintitle">Solved!</p>
       <p class="pp-winline" id="pp-winline"></p>
+      <p class="pp-winline pp-winbest" id="pp-winbest"></p>
     </div>
     <div class="pp-row">
       <button class="pp-btn" id="pp-win-close">Close</button>
