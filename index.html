@@ -226,10 +226,32 @@
   .pp-setup input[type="range"] { width: 100%; accent-color: var(--pp-accent); min-height: 28px; }
   .pp-setup .pp-btn { flex: 0 0 auto; }
 
-  .pp-status { margin: 0; min-height: 1.5em; font-size: 15px; color: var(--pp-ink-soft); }
+  .pp-status { margin: -8px 0 0; min-height: 3em; font-size: 15px; line-height: 1.5; color: var(--pp-ink-soft); }   /* two lines reserved so the tray doesn't jump */
 
   @media (prefers-reduced-motion: no-preference) {
-    .pp-piece { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    .pp-piece { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, opacity .15s ease; }
+  }
+
+  /* ---- Placing: drag and tap ---- */
+  .pp-board, .pp-tray { user-select: none; -webkit-user-select: none; }
+  .pp-board .pp-cell, .pp-piece { touch-action: none; }   /* let a finger drag pieces instead of scrolling */
+  .pp-cell.mine { cursor: grab; }
+  .pp-piece.lifting { opacity: .3; }
+  body.pp-dragging, body.pp-dragging * { cursor: grabbing !important; }
+
+  .pp-cell.ghost.bad .pp-stone {
+    background: rgba(255, 70, 70, .35);
+    outline-color: #ff5252;
+  }
+  .pp-cell.ghost.bad.jr::before, .pp-cell.ghost.bad.jd::after { background: rgba(255, 90, 90, .65); }
+  .pp-cell.clash { outline: 2.5px dashed #ff5252; outline-offset: 1px; }
+
+  .pp-floater {
+    position: fixed; left: 0; top: 0;
+    z-index: 50;
+    pointer-events: none;
+    filter: drop-shadow(0 12px 14px rgba(40, 20, 0, .4));
+    will-change: transform;
   }
 </style>
 
@@ -247,6 +269,7 @@
   </div>
 
   <div class="pp-wood"><div class="pp-board" id="pp-board" role="grid" aria-label="Board, 5 rows by 11 columns"></div></div>
+  <p class="pp-status" id="pp-status" role="status"></p>
 
   <div class="pp-traybar">
     <div class="pp-traylabel"><span>Your stones</span><strong id="pp-selname"></strong></div>
@@ -262,7 +285,6 @@
     <button class="pp-btn" id="pp-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg>Hint</button>
     <button class="pp-btn" id="pp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>Check</button>
   </div>
-  <p class="pp-status" id="pp-status" role="status"></p>
 
   <div class="pp-setup">
     <label for="pp-start">Stones already on the board: <strong id="pp-startval">5</strong>
@@ -273,168 +295,4 @@
 </main>
 
 <script src="engine.js"></script>
-<script>
-(function () {
-  "use strict";
-  const { COLS, N, PIECES, LETTERS, normalize, generatePuzzle, hint } = Engine;
-
-  /* ---------- stones ---------- */
-  const STONES = {
-    A: { c: '#ffd21f', name: 'Lemon' },
-    B: { c: '#1fd3c4', name: 'Aqua' },
-    C: { c: '#4466ff', name: 'Cobalt' },
-    D: { c: '#9a5cff', name: 'Violet' },
-    E: { c: '#ff8a1f', name: 'Tangerine' },
-    F: { c: '#a6f5c8', name: 'Mint' },
-    G: { c: '#ec3fd3', name: 'Fuchsia' },
-    H: { c: '#3cbcff', name: 'Sky' },
-    I: { c: '#45c652', name: 'Leaf' },
-    J: { c: '#ff8fc0', name: 'Rose' },
-    K: { c: '#f3f4ff', name: 'Pearl' },
-    L: { c: '#ec2843', name: 'Cherry' },
-  };
-
-  // Deterministic "random" so each stone keeps its shape between renders.
-  function hash(n) {
-    n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
-    n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
-    return (n ^ (n >>> 16)) >>> 0;
-  }
-  function stoneStyle(key) {
-    let h = hash(key);
-    const r = () => { h = hash(h + 1); return 32 + (h % 36); };        // 32-67%: lopsided, pebble-like
-    const shape = `${r()}% ${r()}% ${r()}% ${r()}% / ${r()}% ${r()}% ${r()}% ${r()}%`;
-    h = hash(h + 7);
-    const tilt = ((h % 31) - 15) + 'deg';                                 // -15..15deg
-    h = hash(h + 3);
-    const sx = (0.9 + (h % 13) / 100).toFixed(2);                         // 0.90-1.02 wide
-    const sy = (0.86 + ((h >>> 8) % 11) / 100).toFixed(2);                // 0.86-0.96 tall: slightly flattened
-    return { shape, tilt, sx, sy };
-  }
-
-  // Paint one cell (board or mini-tray) as a stone of `letter`, joined right/down as needed.
-  function paintCell(el, letter, key, joinRight, joinDown) {
-    el.classList.toggle('jr', !!(letter && joinRight));
-    el.classList.toggle('jd', !!(letter && joinDown));
-    let stone = el.firstElementChild;
-    if (!letter) { if (stone) stone.remove(); el.style.removeProperty('--c'); return; }
-    if (!stone) { stone = document.createElement('span'); stone.className = 'pp-stone'; el.appendChild(stone); }
-    const { shape, tilt, sx, sy } = stoneStyle(key);
-    el.style.setProperty('--c', STONES[letter].c);
-    stone.style.setProperty('--shape', shape);
-    stone.style.setProperty('--tilt', tilt);
-    stone.style.setProperty('--sx', sx);
-    stone.style.setProperty('--sy', sy);
-  }
-
-  /* ---------- board ---------- */
-  const boardEl = document.getElementById('pp-board');
-  const cells = [];
-  for (let i = 0; i < N; i++) {
-    const b = document.createElement('button');
-    b.className = 'pp-cell';
-    b.setAttribute('role', 'gridcell');
-    b.dataset.i = i;
-    boardEl.appendChild(b);
-    cells.push(b);
-  }
-
-  /* ---------- state (static preview until placing is built) ---------- */
-  let puzzle = null;
-  let selected = null;
-  let ghost = null;      // { letter, idxs } shown as a see-through preview
-
-  function newPuzzle() {
-    const k = +document.getElementById('pp-start').value;
-    puzzle = generatePuzzle(k);
-    const h = hint(puzzle.start, puzzle.solution);   // a real, valid spot for the preview
-    ghost = h;
-    selected = h ? h.letter : null;
-    renderAll();
-    popIn();
-  }
-
-  // Stones bounce in, sweeping left to right, whenever a new puzzle appears.
-  function popIn() {
-    cells.forEach((el, i) => el.style.setProperty('--delay', ((i % COLS) * 28 + ((i / COLS) | 0) * 14) + 'ms'));
-    boardEl.classList.remove('popping');
-    void boardEl.offsetWidth;          // restart the animation
-    boardEl.classList.add('popping');
-    clearTimeout(popIn.t);
-    popIn.t = setTimeout(() => boardEl.classList.remove('popping'), 900);
-  }
-
-  function renderBoard() {
-    const view = puzzle.start.slice();
-    const isGhost = new Set();
-    if (ghost && selected === ghost.letter) for (const i of ghost.idxs) { view[i] = ghost.letter; isGhost.add(i); }
-    for (let i = 0; i < N; i++) {
-      const l = view[i], c = i % COLS, el = cells[i];
-      const right = c < COLS - 1 && view[i + 1] === l;
-      const down = i + COLS < N && view[i + COLS] === l;
-      paintCell(el, l, i * 131 + (l ? l.charCodeAt(0) : 0), right, down);
-      el.classList.toggle('ghost', isGhost.has(i));
-      const r = ((i / COLS) | 0) + 1;
-      el.setAttribute('aria-label', `Row ${r}, column ${c + 1}: ${l ? STONES[l].name + (isGhost.has(i) ? ' preview' : ' stone') : 'empty'}`);
-    }
-  }
-
-  function miniCluster(letter) {
-    const cellsN = normalize(PIECES[letter].cells);
-    const rows = Math.max(...cellsN.map(c => c[0])) + 1, cols = Math.max(...cellsN.map(c => c[1])) + 1;
-    const on = new Set(cellsN.map(([r, c]) => r * cols + c));
-    const wrap = document.createElement('span');
-    wrap.className = 'pp-mini';
-    wrap.style.setProperty('--cols', cols);
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const idx = r * cols + c;
-      const s = document.createElement('span');
-      s.className = 'pp-cell' + (on.has(idx) ? '' : ' pp-empty');
-      if (on.has(idx)) paintCell(s, letter, idx * 977 + letter.charCodeAt(0), c < cols - 1 && on.has(idx + 1), on.has(idx + cols));
-      wrap.appendChild(s);
-    }
-    return wrap;
-  }
-
-  const trayEl = document.getElementById('pp-tray');
-  function renderTray() {
-    trayEl.textContent = '';
-    const onBoard = new Set(puzzle.start.filter(Boolean));
-    for (const l of LETTERS) {
-      if (onBoard.has(l)) continue;
-      const b = document.createElement('button');
-      b.className = 'pp-piece';
-      b.dataset.letter = l;
-      b.setAttribute('aria-pressed', String(l === selected));
-      b.setAttribute('aria-label', `${STONES[l].name}, ${PIECES[l].cells.length} stones`);
-      b.appendChild(miniCluster(l));
-      b.addEventListener('click', () => { selected = l; renderAll(); });
-      trayEl.appendChild(b);
-    }
-    document.getElementById('pp-selname').textContent = selected ? STONES[selected].name : '';
-  }
-
-  function renderAll() {
-    renderBoard();
-    renderTray();
-    const placed = new Set(puzzle.start.filter(Boolean)).size;
-    document.getElementById('pp-count').textContent = `${placed}/12`;
-  }
-
-  /* ---------- controls (placeholders until placing is built) ---------- */
-  const statusEl = document.getElementById('pp-status');
-  for (const id of ['pp-rotate', 'pp-flip', 'pp-undo', 'pp-hint', 'pp-check']) {
-    document.getElementById(id).addEventListener('click', () => {
-      statusEl.textContent = 'Not wired up yet: placing, hints and checks arrive in the next steps.';
-    });
-  }
-  boardEl.addEventListener('click', () => {
-    statusEl.textContent = 'Not wired up yet: placing stones arrives in the next step.';
-  });
-  const startInput = document.getElementById('pp-start');
-  startInput.addEventListener('input', () => { document.getElementById('pp-startval').textContent = startInput.value; });
-  document.getElementById('pp-new').addEventListener('click', () => { statusEl.textContent = ''; newPuzzle(); });
-
-  newPuzzle();
-})();
-</script>
+<script src="game.js"></script>
