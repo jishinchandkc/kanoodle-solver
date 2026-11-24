@@ -1,492 +1,356 @@
-<title>Kanoodle Extreme Solver</title>
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pebblepack</title>
+<meta name="description" content="Pebblepack: a packing puzzle. Fit every stone onto the wooden board with no gaps and no overlaps.">
+<meta property="og:title" content="Pebblepack">
+<meta property="og:description" content="A packing puzzle for the browser. Fit twelve stone pieces onto a wooden board: no gaps, no overlaps. Drag or tap, with hints when you're stuck.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#ecebe7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1613" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23c98b4f'/%3E%3Cpath d='M18 20c6-7 21-6 27 1s5 18-3 23-21 4-26-3-4-14 2-21z' fill='%23ff8a1f'/%3E%3Cellipse cx='27' cy='25' rx='7' ry='4' fill='%23fff' opacity='.7'/%3E%3C/svg%3E">
 <style>
   :root {
-    --ground: #f4f2ec;
-    --ink: #23252a;
-    --ink-soft: #5c5f66;
-    --card: #ffffff;
-    --line: #dcd9d0;
-    --tray: #26282d;
-    --tray-hole: #17181c;
-    --tray-edge: #3a3d44;
-    --good: #15803d;
-    --bad: #b91c1c;
-    --focus: #2563eb;
+    --pp-ground: #ecebe7;
+    --pp-card: #fbfaf7;
+    --pp-ink: #26211b;
+    --pp-ink-soft: #6b6257;
+    --pp-line: #d9d3c9;
+    --pp-accent: #ff9f1c;
+    --pp-accent-ink: #1a1200;
+    --pp-wood: #c98b4f;
+    --pp-wood-hi: #dfa96d;
+    --pp-grain: 110, 55, 20;          /* rgb of the grain lines and knots */
+    --pp-well: #74431f;
+    --pp-display: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Varela Round", "Nunito", system-ui, sans-serif;
+    --pp-body: system-ui, "Segoe UI", -apple-system, sans-serif;
+    --pp-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --ground: #1a1b1f;
-      --ink: #ececec;
-      --ink-soft: #a0a3ab;
-      --card: #232529;
-      --line: #34363c;
-      --good: #4ade80;
-      --bad: #f87171;
+    :root:not([data-theme="light"]) {
+      --pp-ground: #1a1613;
+      --pp-card: #25201b;
+      --pp-ink: #f2ede6;
+      --pp-ink-soft: #b2a798;
+      --pp-line: #3a322a;
+      --pp-accent: #ffb341;
+      --pp-accent-ink: #1a1200;
     }
   }
   :root[data-theme="dark"] {
-    --ground: #1a1b1f; --ink: #ececec; --ink-soft: #a0a3ab;
-    --card: #232529; --line: #34363c; --good: #4ade80; --bad: #f87171;
+    --pp-ground: #1a1613; --pp-card: #25201b; --pp-ink: #f2ede6; --pp-ink-soft: #b2a798;
+    --pp-line: #3a322a; --pp-accent: #ffb341; --pp-accent-ink: #1a1200;
   }
   :root[data-theme="light"] {
-    --ground: #f4f2ec; --ink: #23252a; --ink-soft: #5c5f66;
-    --card: #ffffff; --line: #dcd9d0; --good: #15803d; --bad: #b91c1c;
+    --pp-ground: #ecebe7; --pp-card: #fbfaf7; --pp-ink: #26211b; --pp-ink-soft: #6b6257;
+    --pp-line: #d9d3c9; --pp-accent: #ff9f1c; --pp-accent-ink: #1a1200;
   }
 
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--ground);
-    color: var(--ink);
-    font: 16px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--pp-ground);
+    color: var(--pp-ink);
+    font: 16px/1.5 var(--pp-body);
     display: flex;
     justify-content: center;
     padding: 24px 16px 48px;
   }
   main { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 20px; }
 
-  header h1 {
+  /* ---- Header ---- */
+  .pp-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 20px; }
+  .pp-title {
     margin: 0;
-    font-size: clamp(26px, 5vw, 34px);
+    font-family: var(--pp-display);
+    font-size: clamp(34px, 8vw, 46px);
     font-weight: 800;
-    letter-spacing: -0.02em;
-    text-wrap: balance;
+    letter-spacing: -0.015em;
+    line-height: 1;
   }
-  header h1 .dots span {
-    display: inline-block; width: .5em; height: .5em; border-radius: 50%;
-    margin-left: .12em; vertical-align: baseline;
+  .pp-title .pip {
+    display: inline-block; width: .3em; height: .26em; margin-left: .06em;
+    background: var(--pp-accent);
+    border-radius: 48% 52% 45% 55% / 55% 45% 55% 45%;
+    transform: rotate(-12deg);
   }
-  header p { margin: 6px 0 0; color: var(--ink-soft); max-width: 60ch; }
+  .pp-sub { margin: 6px 0 0; color: var(--pp-ink-soft); max-width: 46ch; }
+  .pp-stats { display: flex; gap: 18px; font-size: 14px; color: var(--pp-ink-soft); }
+  .pp-stats b {
+    display: block;
+    font-family: var(--pp-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--pp-ink);
+  }
 
-  /* ---- Board tray (always charcoal, like the real thing) ---- */
-  .tray {
-    background: linear-gradient(160deg, var(--tray-edge), var(--tray) 30%);
-    border-radius: 18px;
+  /* ---- Wooden board ---- */
+  .pp-wood {
+    --gap: clamp(3px, 1.1vw, 8px);
+    /* A soft sheen, two knots, long grain lines, then the base tone. */
+    background:
+      linear-gradient(180deg, rgba(255,240,210,.28), transparent 35%, rgba(60,25,0,.12)),
+      radial-gradient(ellipse 9% 5% at 71% 37%, rgba(var(--pp-grain), .45), rgba(var(--pp-grain), .12) 60%, transparent 75%),
+      radial-gradient(ellipse 16% 8% at 71% 37%, transparent 55%, rgba(var(--pp-grain), .14) 62%, transparent 74%),
+      radial-gradient(ellipse 6% 3.5% at 18% 78%, rgba(var(--pp-grain), .35), transparent 75%),
+      repeating-linear-gradient(178.6deg,
+        rgba(var(--pp-grain), .10) 0 1px, transparent 1px 6px,
+        rgba(var(--pp-grain), .06) 6px 8px, transparent 8px 13px,
+        rgba(var(--pp-grain), .13) 13px 14px, transparent 14px 23px),
+      repeating-linear-gradient(181.2deg, rgba(255,230,190,.07) 0 3px, transparent 3px 17px),
+      linear-gradient(180deg, var(--pp-wood-hi), var(--pp-wood));
+    border-radius: 14px;
     padding: clamp(10px, 2.6vw, 18px);
-    box-shadow: 0 10px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.08);
-    align-self: center;
-    width: 100%;
-    max-width: 700px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,235,200,.55),
+      inset 0 -4px 0 rgba(90,45,10,.35),
+      inset 0 0 0 1px rgba(90,45,10,.35),
+      0 16px 30px -14px rgba(60,30,5,.6);
   }
-  #board {
+  .pp-board {
     display: grid;
     grid-template-columns: repeat(11, 1fr);
-    gap: clamp(3px, 1vw, 7px);
+    gap: var(--gap);
   }
-  .cell {
+  .pp-cell {
+    position: relative;               /* no z-index: stones and joins share the board's stacking context */
     aspect-ratio: 1;
-    border-radius: 50%;
-    border: none;
-    padding: 0;
+    border: none; padding: 0; margin: 0;
+    background: radial-gradient(120% 120% at 50% 30%, color-mix(in srgb, var(--pp-well) 80%, black), var(--pp-well));
+    border-radius: 30%;
+    box-shadow: inset 0 3px 4px rgba(40,15,0,.55), inset 0 -1px 0 rgba(255,225,180,.35), 0 1px 0 rgba(255,230,190,.35);
     cursor: pointer;
-    background: radial-gradient(circle at 38% 32%, #101114, var(--tray-hole) 70%);
-    box-shadow: inset 0 2px 4px rgba(0,0,0,.7), inset 0 -1px 1px rgba(255,255,255,.06);
-    position: relative;
-    touch-action: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
-  .cell.filled {
-    background:
-      radial-gradient(circle at 33% 28%, rgba(255,255,255,.85), rgba(255,255,255,0) 28%),
-      radial-gradient(circle at 50% 45%, var(--ball) 40%, color-mix(in srgb, var(--ball) 55%, black) 100%);
-    box-shadow: inset 0 -3px 6px rgba(0,0,0,.35), 0 2px 3px rgba(0,0,0,.45);
-  }
-  .cell.solved { opacity: .92; }
-  .cell.solved::after {
-    content: "";
-    position: absolute; inset: 26%;
-    border-radius: 50%;
-    border: 2px dashed rgba(0,0,0,.35);
-  }
-  .cell:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .pp-cell:focus-visible { outline: 3px solid var(--pp-accent); outline-offset: 2px; }
 
-  /* ---- Palette ---- */
-  .palette {
+  /* Stones: glossy, irregular, joined to same-piece neighbours by bridges. */
+  .pp-stone {
+    position: absolute; inset: 5%;
+    z-index: 1;
+    border-radius: var(--shape);
+    transform: rotate(var(--tilt)) scale(var(--sx, 1), var(--sy, 1));
+    background:
+      radial-gradient(60% 45% at 34% 24%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 45%, transparent 72%),
+      radial-gradient(130% 120% at 45% 35%, color-mix(in srgb, var(--c) 80%, white) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 58%, black) 100%);
+    box-shadow:
+      0 3px 4px rgba(45,20,0,.5),
+      inset 0 -3px 5px color-mix(in srgb, var(--c) 50%, black),
+      0 0 10px -2px color-mix(in srgb, var(--c) 70%, transparent);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pp-board.popping .pp-stone { animation: pp-pop .38s cubic-bezier(.3,1.6,.5,1) both; animation-delay: var(--delay, 0ms); }
+    @keyframes pp-pop {
+      from { transform: rotate(var(--tilt)) scale(0); }
+      to   { transform: rotate(var(--tilt)) scale(var(--sx, 1), var(--sy, 1)); }
+    }
+  }
+  .pp-cell.jr::before, .pp-cell.jd::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    background: color-mix(in srgb, var(--c) 70%, #2a1405);
+    border-radius: 3px;
+  }
+  .pp-cell.jr::before { left: 50%; top: 33%; height: 34%; width: calc(100% + var(--gap)); }
+  .pp-cell.jd::after  { top: 50%; left: 33%; width: 34%; height: calc(100% + var(--gap)); }
+
+  .pp-cell.ghost .pp-stone {
+    background: color-mix(in srgb, var(--c) 45%, transparent);
+    box-shadow: none;
+    outline: 2px dashed rgba(255,255,255,.9);
+    outline-offset: -2px;
+  }
+  .pp-cell.ghost.jr::before, .pp-cell.ghost.jd::after { background: rgba(255,255,255,.55); }
+
+  /* ---- Piece tray ---- */
+  .pp-traybar { display: flex; flex-direction: column; gap: 10px; }
+  .pp-traylabel { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--pp-ink-soft); }
+  .pp-traylabel strong { color: var(--pp-ink); font-weight: 600; }
+  .pp-tray {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
     gap: 8px;
   }
-  .chip {
-    background: var(--card);
-    border: 2px solid var(--line);
+  .pp-piece {
+    background: var(--pp-card);
+    border: 1.5px solid var(--pp-line);
+    border-radius: 14px;
+    min-height: 78px;
+    padding: 10px 6px;
+    display: grid; place-items: center;
+    cursor: pointer;
+    font: inherit; color: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pp-piece[aria-pressed="true"] {
+    border-color: var(--pp-accent);
+    box-shadow: 0 0 0 2px var(--pp-accent), 0 6px 14px -8px rgba(0,0,0,.5);
+    transform: translateY(-2px);
+  }
+  .pp-piece:focus-visible { outline: 3px solid var(--pp-accent); outline-offset: 2px; }
+  .pp-traynote { grid-column: 1 / -1; margin: 0; padding: 14px 0; color: var(--pp-ink-soft); font-size: 15px; }
+  .pp-mini {
+    --gap: 2px;
+    display: grid;
+    gap: var(--gap);
+    grid-template-columns: repeat(var(--cols), var(--u));
+    grid-auto-rows: var(--u);
+    --u: 13px;
+  }
+  .pp-mini .pp-cell { background: transparent; box-shadow: none; aspect-ratio: auto; cursor: inherit; }
+  .pp-mini .pp-empty { visibility: hidden; }
+
+  /* ---- Buttons ---- */
+  .pp-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pp-btn {
+    font: inherit; font-size: 15px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    min-height: 44px;
+    padding: 0 16px;
     border-radius: 12px;
-    padding: 8px 6px 6px;
+    border: 1.5px solid var(--pp-line);
+    background: var(--pp-card);
+    color: var(--pp-ink);
     cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; gap: 5px;
-    color: var(--ink);
-    font: inherit;
+    flex: 1 1 auto;
   }
-  .chip[aria-pressed="true"] { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 35%, transparent); }
-  .chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-  .chip svg { display: block; }
-  .chip .label {
-    font-size: 12px; color: var(--ink-soft);
-    display: flex; gap: 6px; align-items: baseline;
-  }
-  .chip .count { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .chip.placed .count { color: var(--good); }
-  .chip.overfull .count, .chip.badshape .count { color: var(--bad); }
-  .chip.eraser .swatchline { font-size: 20px; line-height: 34px; }
+  .pp-btn svg { width: 18px; height: 18px; flex: none; }
+  .pp-btn.primary { background: var(--pp-ink); border-color: var(--pp-ink); color: var(--pp-ground); }
+  .pp-btn:disabled { opacity: .4; cursor: default; }
+  .pp-btn:focus-visible { outline: 3px solid var(--pp-accent); outline-offset: 2px; }
 
-  /* ---- Controls ---- */
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .controls button {
-    font: inherit; font-weight: 600;
-    border-radius: 10px;
-    padding: 10px 18px;
-    cursor: pointer;
-    border: 2px solid var(--ink);
-    background: var(--ink);
-    color: var(--ground);
+  .pp-setup {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+    padding-top: 16px;
+    border-top: 1.5px solid var(--pp-line);
   }
-  .controls button.secondary { background: transparent; color: var(--ink); }
-  .controls button:disabled { opacity: .45; cursor: default; }
-  .controls button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .pp-setup label { flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--pp-ink-soft); }
+  .pp-setup label strong { color: var(--pp-ink); font-variant-numeric: tabular-nums; }
+  .pp-setup input[type="range"] { width: 100%; accent-color: var(--pp-accent); min-height: 28px; }
+  .pp-setup .pp-btn { flex: 0 0 auto; }
 
-  #status { min-height: 1.5em; margin: 0; font-weight: 600; }
-  #status.ok { color: var(--good); }
-  #status.err { color: var(--bad); }
-  #status .sub { display: block; font-weight: 400; color: var(--ink-soft); font-size: 14px; }
+  .pp-status { margin: -8px 0 0; min-height: 3em; font-size: 15px; line-height: 1.5; color: var(--pp-ink-soft); }   /* two lines reserved so the tray doesn't jump */
 
   @media (prefers-reduced-motion: no-preference) {
-    .cell.filled { transition: opacity .15s ease; }
+    .pp-piece { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, opacity .15s ease; }
+  }
+
+  /* ---- Placing: drag and tap ---- */
+  .pp-board, .pp-tray { user-select: none; -webkit-user-select: none; }
+  .pp-board .pp-cell, .pp-piece { touch-action: none; }   /* let a finger drag pieces instead of scrolling */
+  .pp-cell.mine { cursor: grab; }
+  .pp-piece.lifting { opacity: .3; }
+  body.pp-dragging, body.pp-dragging * { cursor: grabbing !important; }
+
+  .pp-cell.ghost.bad .pp-stone {
+    background: rgba(255, 70, 70, .35);
+    outline-color: #ff5252;
+  }
+  .pp-cell.ghost.bad.jr::before, .pp-cell.ghost.bad.jd::after { background: rgba(255, 90, 90, .65); }
+  .pp-cell.clash { outline: 2.5px dashed #ff5252; outline-offset: 1px; }
+
+  /* ---- Hint, Check and the win ---- */
+  .pp-status[hidden], .pp-win[hidden] { display: none; }
+  .pp-win {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px 16px;
+    margin-top: -8px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--pp-card);
+    border: 1.5px solid var(--pp-accent);
+    box-shadow: 0 10px 24px -14px rgba(60, 30, 5, .55);
+  }
+  .pp-wintitle { margin: 0; font-family: var(--pp-display); font-size: 26px; font-weight: 800; line-height: 1.1; }
+  .pp-winline { margin: 4px 0 0; color: var(--pp-ink-soft); font-size: 15px; }
+  .pp-win .pp-row { flex: 0 1 auto; }
+  .pp-winbest { margin-top: 2px; color: var(--pp-ink); font-weight: 600; }
+  .pp-winbest:empty { display: none; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Win: every stone hops in a wave from left to right. */
+    .pp-board.cheering .pp-stone { animation: pp-hop .6s cubic-bezier(.3, .7, .4, 1) both; animation-delay: var(--delay, 0ms); }
+    @keyframes pp-hop {
+      0%, 100% { transform: rotate(var(--tilt)) scale(var(--sx, 1), var(--sy, 1)); }
+      40%      { transform: translateY(-38%) rotate(var(--tilt)) scale(1.08); }
+    }
+    /* Hint: the new stone glints. */
+    .pp-cell.hinted .pp-stone { animation: pp-glint 1.4s ease-out both; }
+    @keyframes pp-glint {
+      0%   { box-shadow: 0 0 0 0 rgba(255,255,255,.95), 0 0 18px 6px rgba(255,214,90,.9); }
+      100% { box-shadow: 0 3px 4px rgba(45,20,0,.5), 0 0 0 0 rgba(255,214,90,0); }
+    }
+    /* Check: a green ripple when it's still solvable, a red shake when it's stuck. */
+    .pp-wood.flash-good { animation: pp-good .9s ease-out; }
+    .pp-wood.flash-bad  { animation: pp-bad-ring .9s ease-out, pp-shake .45s ease-in-out; }
+    @keyframes pp-good     { from { outline: 3px solid rgba(69,198,82,.95); outline-offset: 2px; } to { outline: 3px solid rgba(69,198,82,0); outline-offset: 14px; } }
+    @keyframes pp-bad-ring { from { outline: 3px solid rgba(236,40,67,.95); outline-offset: 2px; } to { outline: 3px solid rgba(236,40,67,0); outline-offset: 14px; } }
+    @keyframes pp-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  }
+
+  .pp-floater {
+    position: fixed; left: 0; top: 0;
+    z-index: 50;
+    pointer-events: none;
+    filter: drop-shadow(0 12px 14px rgba(40, 20, 0, .4));
+    will-change: transform;
   }
 </style>
 
+<body>
 <main>
-  <header>
-    <h1>Kanoodle Extreme Solver<span class="dots" aria-hidden="true"><span style="background:#f97316"></span><span style="background:#38bdf8"></span><span style="background:#a3e635"></span></span></h1>
-    <p>Paint the pieces already on your 5×11 board — pick a color, then click or drag across the holes it fills. Hit Solve to fill in the rest.</p>
-  </header>
-
-  <div class="tray"><div id="board" role="grid" aria-label="Kanoodle board, 5 rows by 11 columns"></div></div>
-
-  <div class="palette" id="palette"></div>
-
-  <div class="controls">
-    <button id="solveBtn">Solve</button>
-    <button id="unsolveBtn" class="secondary" disabled>Remove solution</button>
-    <button id="clearBtn" class="secondary">Clear board</button>
+  <div class="pp-head">
+    <div>
+      <h1 class="pp-title">Pebblepack<span class="pip" aria-hidden="true"></span></h1>
+      <p class="pp-sub">Fit every remaining stone onto the board. No gaps, no overlaps.</p>
+    </div>
+    <div class="pp-stats">
+      <div>Time<b id="pp-time">0:00</b></div>
+      <div>Best<b id="pp-best">–</b></div>
+      <div>Stones<b id="pp-count">0/12</b></div>
+    </div>
   </div>
-  <p id="status" role="status"></p>
+
+  <div class="pp-wood"><div class="pp-board" id="pp-board" role="grid" aria-label="Board, 5 rows by 11 columns"></div></div>
+  <p class="pp-status" id="pp-status" role="status"></p>
+  <div class="pp-win" id="pp-win" role="status" hidden>
+    <div>
+      <p class="pp-wintitle">Solved!</p>
+      <p class="pp-winline" id="pp-winline"></p>
+      <p class="pp-winline pp-winbest" id="pp-winbest"></p>
+    </div>
+    <div class="pp-row">
+      <button class="pp-btn" id="pp-win-close">Close</button>
+      <button class="pp-btn primary" id="pp-win-new">New puzzle</button>
+    </div>
+  </div>
+
+  <div class="pp-traybar">
+    <div class="pp-traylabel"><span>Your stones</span><strong id="pp-selname"></strong></div>
+    <div class="pp-tray" id="pp-tray"></div>
+    <div class="pp-row">
+      <button class="pp-btn" id="pp-rotate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>Rotate</button>
+      <button class="pp-btn" id="pp-flip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M8 7 3 12l5 5V7Z"/><path d="m16 7 5 5-5 5V7Z"/></svg>Flip</button>
+    </div>
+  </div>
+
+  <div class="pp-row">
+    <button class="pp-btn" id="pp-undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Undo</button>
+    <button class="pp-btn" id="pp-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg>Hint</button>
+    <button class="pp-btn" id="pp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>Check</button>
+  </div>
+
+  <div class="pp-setup">
+    <label for="pp-start">Stones already on the board: <strong id="pp-startval">5</strong>
+      <input type="range" id="pp-start" min="0" max="11" step="1" value="5">
+    </label>
+    <button class="pp-btn primary" id="pp-new">New puzzle</button>
+  </div>
 </main>
 
-<script>
-"use strict";
-const ROWS = 5, COLS = 11, N = ROWS * COLS;
-
-const PIECES = {
-  A: { color: '#f97316', name: 'Orange',     cells: [[0,0],[1,0],[2,0],[2,1]] },
-  B: { color: '#dc2626', name: 'Red',        cells: [[0,0],[0,1],[1,0],[1,1],[2,0]] },
-  C: { color: '#1d4ed8', name: 'Dark blue',  cells: [[0,0],[1,0],[2,0],[3,0],[3,1]] },
-  D: { color: '#f9a8d4', name: 'Pink',       cells: [[0,0],[1,0],[1,1],[2,0],[3,0]] },
-  E: { color: '#15803d', name: 'Green',      cells: [[0,0],[1,0],[1,1],[2,1],[3,1]] },
-  F: { color: '#f4f4f5', name: 'White',      cells: [[0,0],[0,1],[1,0]] },
-  G: { color: '#38bdf8', name: 'Light blue', cells: [[0,0],[1,0],[2,0],[2,1],[2,2]] },
-  H: { color: '#db2777', name: 'Magenta',    cells: [[0,0],[1,0],[1,1],[2,1],[2,2]] },
-  I: { color: '#facc15', name: 'Yellow',     cells: [[0,0],[0,1],[1,0],[2,0],[2,1]] },
-  J: { color: '#7c3aed', name: 'Purple',     cells: [[0,0],[1,0],[2,0],[3,0]] },
-  K: { color: '#a3e635', name: 'Lime',       cells: [[0,0],[0,1],[1,0],[1,1]] },
-  L: { color: '#9ca3af', name: 'Gray',       cells: [[0,1],[1,0],[1,1],[1,2],[2,1]] },
-};
-
-/* ---------- solver core (verified in node) ---------- */
-function normalize(cells) {
-  const mr = Math.min(...cells.map(c => c[0]));
-  const mc = Math.min(...cells.map(c => c[1]));
-  return cells.map(([r, c]) => [r - mr, c - mc]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-}
-const shapeKey = cells => normalize(cells).map(c => c.join(',')).join(';');
-
-function orientations(cells) {
-  const seen = new Map();
-  let cur = cells;
-  for (let flip = 0; flip < 2; flip++) {
-    for (let rot = 0; rot < 4; rot++) {
-      seen.set(shapeKey(cur), normalize(cur));
-      cur = cur.map(([r, c]) => [c, -r]);
-    }
-    cur = cur.map(([r, c]) => [r, -c]);
-  }
-  return [...seen.values()];
-}
-
-const LETTERS = Object.keys(PIECES);
-const PIDX = Object.fromEntries(LETTERS.map((l, i) => [l, i]));
-
-// Board occupancy as two ints: lo = cells 0-26, hi = cells 27-54.
-const PLACEMENTS = (() => {
-  const byAnchor = Array.from({ length: N }, () => []);
-  for (const [letter, piece] of Object.entries(PIECES)) {
-    for (const orient of orientations(piece.cells)) {
-      const maxR = Math.max(...orient.map(c => c[0]));
-      const maxC = Math.max(...orient.map(c => c[1]));
-      for (let r = 0; r + maxR < ROWS; r++) {
-        for (let c = 0; c + maxC < COLS; c++) {
-          const idxs = orient.map(([dr, dc]) => (r + dr) * COLS + (c + dc)).sort((a, b) => a - b);
-          let lo = 0, hi = 0;
-          for (const i of idxs) { if (i < 27) lo |= 1 << i; else hi |= 1 << (i - 27); }
-          byAnchor[idxs[0]].push({ pi: PIDX[letter], letter, lo, hi, idxs });
-        }
-      }
-    }
-  }
-  return byAnchor;
-})();
-
-const ORIENT_KEYS = Object.fromEntries(
-  Object.entries(PIECES).map(([l, p]) => [l, new Set(orientations(p.cells).map(shapeKey))])
-);
-
-const NEI = Array.from({ length: N }, (_, i) => {
-  const r = (i / COLS) | 0, c = i % COLS, n = [];
-  if (r > 0) n.push(i - COLS);
-  if (r < ROWS - 1) n.push(i + COLS);
-  if (c > 0) n.push(i - 1);
-  if (c < COLS - 1) n.push(i + 1);
-  return n;
-});
-
-const NODE_LIMIT = 5_000_000;
-
-function solve(board) {
-  let lo0 = 0, hi0 = 0, used0 = 0;
-  const out = board.slice();
-  board.forEach((l, i) => {
-    if (!l) return;
-    if (i < 27) lo0 |= 1 << i; else hi0 |= 1 << (i - 27);
-    used0 |= 1 << PIDX[l];
-  });
-  let nodes = 0;
-  const seen = new Uint8Array(N);
-  const stack = new Int32Array(N);
-
-  // Prune: an empty region smaller than 3 cells can never be filled (smallest piece is 3).
-  function hasDeadRegion(lo, hi) {
-    seen.fill(0);
-    for (let s = 0; s < N; s++) {
-      const filled = s < 27 ? (lo >>> s) & 1 : (hi >>> (s - 27)) & 1;
-      if (filled || seen[s]) continue;
-      let sp = 0, size = 0;
-      stack[sp++] = s; seen[s] = 1;
-      while (sp) {
-        const i = stack[--sp]; size++;
-        for (const j of NEI[i]) {
-          const f = j < 27 ? (lo >>> j) & 1 : (hi >>> (j - 27)) & 1;
-          if (!f && !seen[j]) { seen[j] = 1; stack[sp++] = j; }
-        }
-      }
-      if (size < 3) return true;
-    }
-    return false;
-  }
-
-  function step(lo, hi, used, from) {
-    let anchor = -1;
-    for (let i = from; i < N; i++) {
-      const f = i < 27 ? (lo >>> i) & 1 : (hi >>> (i - 27)) & 1;
-      if (!f) { anchor = i; break; }
-    }
-    if (anchor === -1) return true;
-    for (const p of PLACEMENTS[anchor]) {
-      if (used & (1 << p.pi)) continue;
-      if ((lo & p.lo) | (hi & p.hi)) continue;
-      if (++nodes > NODE_LIMIT) throw new Error('limit');
-      const nlo = lo | p.lo, nhi = hi | p.hi;
-      if (!hasDeadRegion(nlo, nhi) && step(nlo, nhi, used | (1 << p.pi), anchor + 1)) {
-        for (const i of p.idxs) out[i] = p.letter;
-        return true;
-      }
-    }
-    return false;
-  }
-
-  try {
-    return step(lo0, hi0, used0, 0) ? { ok: true, board: out, nodes } : { ok: false, nodes };
-  } catch (e) {
-    return { ok: false, limit: true, nodes };
-  }
-}
-
-/* ---------- state ---------- */
-let painted = Array(N).fill(null);   // user-painted piece letters
-let solution = null;                  // full solved board, or null
-let selected = 'A';                   // selected palette letter, or 'ERASE'
-let dragging = false;
-let dragMode = null;                  // 'paint' | 'erase' during a drag
-
-/* ---------- board UI ---------- */
-const boardEl = document.getElementById('board');
-const cellEls = [];
-for (let i = 0; i < N; i++) {
-  const b = document.createElement('button');
-  b.className = 'cell';
-  b.setAttribute('role', 'gridcell');
-  b.dataset.i = i;
-  boardEl.appendChild(b);
-  cellEls.push(b);
-}
-
-function cellLabel(i) {
-  const r = ((i / COLS) | 0) + 1, c = (i % COLS) + 1;
-  const l = solution ? solution[i] : painted[i];
-  const what = l ? `${PIECES[l].name} piece` : 'empty';
-  return `Row ${r}, column ${c}: ${what}`;
-}
-
-function render() {
-  const view = solution ?? painted;
-  for (let i = 0; i < N; i++) {
-    const l = view[i];
-    const el = cellEls[i];
-    el.classList.toggle('filled', !!l);
-    el.classList.toggle('solved', !!l && solution !== null && painted[i] === null);
-    el.style.setProperty('--ball', l ? PIECES[l].color : 'transparent');
-    el.setAttribute('aria-label', cellLabel(i));
-  }
-  document.getElementById('unsolveBtn').disabled = solution === null;
-  renderPalette();
-}
-
-/* ---------- painting ---------- */
-function applyAt(i) {
-  if (solution) { solution = null; setStatus('', ''); } // editing invalidates the shown solution
-  if (dragMode === 'erase') painted[i] = null;
-  else painted[i] = selected === 'ERASE' ? null : selected;
-  render();
-}
-
-boardEl.addEventListener('pointerdown', e => {
-  const t = e.target.closest('.cell');
-  if (!t) return;
-  e.preventDefault();
-  const i = +t.dataset.i;
-  dragging = true;
-  dragMode = (selected === 'ERASE' || painted[i] === selected) ? 'erase' : 'paint';
-  applyAt(i);
-});
-boardEl.addEventListener('pointerover', e => {
-  if (!dragging) return;
-  const t = e.target.closest('.cell');
-  if (t) applyAt(+t.dataset.i);
-});
-window.addEventListener('pointerup', () => { dragging = false; dragMode = null; });
-
-boardEl.addEventListener('keydown', e => {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-  const t = e.target.closest('.cell');
-  if (!t) return;
-  e.preventDefault();
-  const i = +t.dataset.i;
-  dragMode = (selected === 'ERASE' || painted[i] === selected) ? 'erase' : 'paint';
-  applyAt(i);
-  dragMode = null;
-});
-
-/* ---------- palette UI ---------- */
-function pieceSVG(letter) {
-  const p = PIECES[letter];
-  const cells = normalize(p.cells);
-  const maxR = Math.max(...cells.map(c => c[0])), maxC = Math.max(...cells.map(c => c[1]));
-  const u = 12;
-  const w = (maxC + 1) * u, h = (maxR + 1) * u;
-  const balls = cells.map(([r, c]) =>
-    `<circle cx="${c * u + u / 2}" cy="${r * u + u / 2}" r="${u / 2 - 1}" fill="${p.color}" stroke="rgba(0,0,0,.25)"/>`
-  ).join('');
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${balls}</svg>`;
-}
-
-const paletteEl = document.getElementById('palette');
-function buildPalette() {
-  for (const letter of Object.keys(PIECES)) {
-    const chip = document.createElement('button');
-    chip.className = 'chip';
-    chip.dataset.letter = letter;
-    chip.innerHTML = `<span class="swatchline">${pieceSVG(letter)}</span>
-      <span class="label"><span>${PIECES[letter].name}</span><span class="count"></span></span>`;
-    chip.addEventListener('click', () => { selected = letter; renderPalette(); });
-    paletteEl.appendChild(chip);
-  }
-  const eraser = document.createElement('button');
-  eraser.className = 'chip eraser';
-  eraser.dataset.letter = 'ERASE';
-  eraser.innerHTML = `<span class="swatchline" aria-hidden="true">🧽</span>
-    <span class="label"><span>Eraser</span><span class="count"></span></span>`;
-  eraser.addEventListener('click', () => { selected = 'ERASE'; renderPalette(); });
-  paletteEl.appendChild(eraser);
-}
-
-function renderPalette() {
-  const counts = {};
-  painted.forEach(l => { if (l) counts[l] = (counts[l] || 0) + 1; });
-  for (const chip of paletteEl.children) {
-    const letter = chip.dataset.letter;
-    chip.setAttribute('aria-pressed', String(letter === selected));
-    if (letter === 'ERASE') continue;
-    const size = PIECES[letter].cells.length;
-    const n = counts[letter] || 0;
-    const countEl = chip.querySelector('.count');
-    countEl.textContent = `${n}/${size}`;
-    chip.classList.toggle('placed', n === size);
-    chip.classList.toggle('overfull', n > size);
-    chip.setAttribute('aria-label',
-      `${PIECES[letter].name} piece, ${n} of ${size} balls painted${letter === selected ? ', selected' : ''}`);
-  }
-}
-
-/* ---------- validation + solving ---------- */
-function validationErrors() {
-  const groups = {};
-  painted.forEach((l, i) => { if (l) (groups[l] ||= []).push([(i / COLS) | 0, i % COLS]); });
-  const errors = [];
-  for (const [letter, cells] of Object.entries(groups)) {
-    if (!ORIENT_KEYS[letter].has(shapeKey(cells))) errors.push(letter);
-  }
-  return errors;
-}
-
-const statusEl = document.getElementById('status');
-function setStatus(html, cls) { statusEl.innerHTML = html; statusEl.className = cls; }
-
-document.getElementById('solveBtn').addEventListener('click', () => {
-  const errors = validationErrors();
-  if (errors.length) {
-    const names = errors.map(l => `${PIECES[l].name} (${painted.filter(x => x === l).length}/${PIECES[l].cells.length} balls)`).join(', ');
-    setStatus(`Fix these pieces first: ${names}.<span class="sub">Each color must form that piece's exact shape — check the palette previews.</span>`, 'err');
-    return;
-  }
-  setStatus('Solving…', '');
-  document.getElementById('solveBtn').disabled = true;
-  setTimeout(() => {
-    const t0 = performance.now();
-    const res = solve(painted);
-    const ms = Math.max(1, Math.round(performance.now() - t0));
-    document.getElementById('solveBtn').disabled = false;
-    if (res.ok) {
-      solution = res.board;
-      setStatus(`Solved in ${ms} ms.<span class="sub">Dashed balls are the solver's additions; your painted pieces are untouched.</span>`, 'ok');
-    } else if (res.limit) {
-      setStatus('Search limit reached without finding a solution — this position is almost certainly impossible.', 'err');
-    } else {
-      solution = null;
-      setStatus(`No solution exists for this arrangement (checked in ${ms} ms). One of the placed pieces must move.`, 'err');
-    }
-    render();
-  }, 30);
-});
-
-document.getElementById('unsolveBtn').addEventListener('click', () => {
-  solution = null;
-  setStatus('Solution removed — your painted pieces are still there.', '');
-  render();
-});
-
-document.getElementById('clearBtn').addEventListener('click', () => {
-  painted = Array(N).fill(null);
-  solution = null;
-  setStatus('', '');
-  render();
-});
-
-buildPalette();
-render();
-</script>
+<script src="engine.js"></script>
+<script src="game.js"></script>
