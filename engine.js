@@ -1,23 +1,25 @@
-// Shared puzzle engine for the Solve tab and the Pebblepack game.
+// Pebblepack puzzle engine: piece shapes, solver, puzzle generation, Check and Hint.
 // Works as a plain <script> in the browser (exposes window.Engine) and as a Node module (for tests).
 (function (root) {
   "use strict";
 
   const ROWS = 5, COLS = 11, N = ROWS * COLS;
 
+  // The 12 stone pieces (shapes only; colours and names live in the page).
+  // Together they cover the 5x11 board exactly: 55 cells.
   const PIECES = {
-    A: { color: '#f97316', name: 'Orange',     cells: [[0,0],[1,0],[2,0],[2,1]] },
-    B: { color: '#dc2626', name: 'Red',        cells: [[0,0],[0,1],[1,0],[1,1],[2,0]] },
-    C: { color: '#1d4ed8', name: 'Dark blue',  cells: [[0,0],[1,0],[2,0],[3,0],[3,1]] },
-    D: { color: '#f9a8d4', name: 'Pink',       cells: [[0,0],[1,0],[1,1],[2,0],[3,0]] },
-    E: { color: '#15803d', name: 'Green',      cells: [[0,0],[1,0],[1,1],[2,1],[3,1]] },
-    F: { color: '#f4f4f5', name: 'White',      cells: [[0,0],[0,1],[1,0]] },
-    G: { color: '#38bdf8', name: 'Light blue', cells: [[0,0],[1,0],[2,0],[2,1],[2,2]] },
-    H: { color: '#db2777', name: 'Magenta',    cells: [[0,0],[1,0],[1,1],[2,1],[2,2]] },
-    I: { color: '#facc15', name: 'Yellow',     cells: [[0,0],[0,1],[1,0],[2,0],[2,1]] },
-    J: { color: '#7c3aed', name: 'Purple',     cells: [[0,0],[1,0],[2,0],[3,0]] },
-    K: { color: '#a3e635', name: 'Lime',       cells: [[0,0],[0,1],[1,0],[1,1]] },
-    L: { color: '#9ca3af', name: 'Gray',       cells: [[0,1],[1,0],[1,1],[1,2],[2,1]] },
+    A: { cells: [[0,0],[1,0],[2,0],[2,1]] },
+    B: { cells: [[0,0],[0,1],[1,0],[1,1],[2,0]] },
+    C: { cells: [[0,0],[1,0],[2,0],[3,0],[3,1]] },
+    D: { cells: [[0,0],[1,0],[1,1],[2,0],[3,0]] },
+    E: { cells: [[0,0],[1,0],[1,1],[2,1],[3,1]] },
+    F: { cells: [[0,0],[0,1],[1,0]] },
+    G: { cells: [[0,0],[1,0],[2,0],[2,1],[2,2]] },
+    H: { cells: [[0,0],[1,0],[1,1],[2,1],[2,2]] },
+    I: { cells: [[0,0],[0,1],[1,0],[2,0],[2,1]] },
+    J: { cells: [[0,0],[1,0],[2,0],[3,0]] },
+    K: { cells: [[0,0],[0,1],[1,0],[1,1]] },
+    L: { cells: [[0,1],[1,0],[1,1],[1,2],[2,1]] },
   };
   const LETTERS = Object.keys(PIECES);
   const PIDX = Object.fromEntries(LETTERS.map((l, i) => [l, i]));

@@ -23,7 +23,7 @@ console.log('\nGeometry');
 test('pieces cover exactly 55 cells', () => {
   assert(LETTERS.reduce((s, l) => s + PIECES[l].cells.length, 0) === N);
 });
-test('orientation counts match the real pieces', () => {
+test('orientation counts are right for each piece shape', () => {
   const got = LETTERS.map(l => E.orientations(PIECES[l].cells).length).join(',');
   assert(got === '8,8,8,8,8,4,4,4,4,2,1,1', got);
 });
@@ -37,7 +37,7 @@ test('rotate x4 and flip x2 return to the start', () => {
   }
 });
 
-console.log('\nSolver (unchanged behaviour for the Solve tab)');
+console.log('\nSolver');
 test('empty board solves to a valid full board', () => {
   const r = E.solve(Array(N).fill(null));
   assert(r.ok); assertValidSolution(r.board);

@@ -1,32 +1,36 @@
-# Kanoodle Extreme Solver
+# Pebblepack
 
-A solver for the Kanoodle Extreme puzzle. The physical puzzle asks you to fill a
-5x11 board with a fixed set of coloured pieces. This tool takes a partially
-filled board and completes it.
+A packing puzzle for the browser. Fit twelve stone pieces onto a 5x11 wooden
+board with no gaps and no overlaps.
 
-**Use it:** https://kanoodlesolver.netlify.app/
+> Work in progress. This README will be expanded when the game is finished.
 
-## What it does
+## How it works
 
-- Paint the pieces already placed on your board by picking a colour and clicking
-  or dragging across the holes it fills
-- Solve fills in every remaining piece
-- Remove a solution and try a different starting position
-- Clear the board and start again
+- Each puzzle starts with some stones already on the board (you choose how many,
+  0 to 11) and you place the rest
+- Puzzles are cut from a full solution, so every one is solvable
+- Check tells you whether your board can still be finished; Hint places one
+  correct piece
 
 ## The problem
 
 Fitting a fixed set of irregular pieces into a 5x11 grid with no gaps and no
-overlaps is a constraint satisfaction problem — a search over placements where
-pieces already on the board fix part of the solution.
+overlaps is a constraint satisfaction problem: a search over placements where
+pieces already on the board fix part of the solution. The engine uses a
+backtracking search with bitmask boards and dead-region pruning, and solves
+any position in well under a second.
 
 ## How it was built
 
 Built with AI coding assistance (Claude Code). My work was the product side:
-defining the problem, specifying the input method (paint what is already placed
-rather than typing coordinates), testing against real boards, and iterating on
-the interface. Deployed on Netlify.
+defining the problem, the game design and interaction (drag or tap to place,
+Check and Hint), the visual direction, and testing on phone and desktop.
 
 ## Stack
 
 Static HTML, CSS and JavaScript. No build step, no dependencies.
+
+Run the engine tests with:
+
+    node tests/engine.test.js
