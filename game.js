@@ -83,6 +83,39 @@
   let press = null;         // pointer that is down on a stone (may become a drag)
   let drag = null;          // active drag: { letter, grab, fromBoard, floater }
   let suppressClick = false;
+  let hintsUsed = 0;
+  let boardVersion = 0;     // bumps on every change, so a slow Check/Hint answer for an older board is ignored
+  let busy = false;         // a Check or Hint is running
+  let winShown = false;     // the "Solved!" card is showing
+
+  /* =====================================================================
+     Check and Hint run in a background worker so a hard board never freezes
+     the page. If workers aren't available, they run here instead.
+     ===================================================================== */
+  const runHere = (op, board, preferred) =>
+    op === 'check' ? { solvable: Engine.check(board).solvable } : Engine.hint(board, preferred);
+  let worker = null, nextId = 1;
+  const pending = new Map();   // id -> { resolve, op, board, preferred }
+  try {
+    worker = new Worker('engine-worker.js');
+    worker.onmessage = e => {
+      const p = pending.get(e.data.id);
+      if (p) { pending.delete(e.data.id); p.resolve(e.data.result); }
+    };
+    worker.onerror = () => {   // fall back for anything in flight, and for everything after
+      worker = null;
+      for (const [id, p] of pending) { pending.delete(id); p.resolve(runHere(p.op, p.board, p.preferred)); }
+    };
+  } catch (err) { worker = null; }
+
+  function ask(op, board, preferred) {
+    if (!worker) return Promise.resolve(runHere(op, board, preferred));
+    return new Promise(resolve => {
+      const id = nextId++;
+      pending.set(id, { resolve, op, board, preferred });
+      worker.postMessage({ id, op, board, preferred });
+    });
+  }
 
   const rcOf = i => [(i / COLS) | 0, i % COLS];
   const name = l => STONES[l].name;
@@ -128,13 +161,18 @@
      ===================================================================== */
   function snapshot() { history.push(new Map([...placed].map(([l, v]) => [l, v.slice()]))); }
 
-  function place(letter, idxs) {
+  const isFull = () => occupancy().every(Boolean);
+
+  function place(letter, idxs, how) {
     snapshot();
     placed.set(letter, idxs.slice().sort((a, b) => a - b));
+    orient[letter] = normalize(idxs.map(rcOf));
     if (selected === letter) selected = null;
     ghost = null;
+    boardVersion++;
+    if (isFull()) { win(); return; }
     const left = inTray().length;
-    say(left ? `${name(letter)} placed. ${left} to go.` : 'Every stone is on the board. Nicely done!');
+    say(how === 'hint' ? `Hint: ${name(letter)} goes here. ${left} to go.` : `${name(letter)} placed. ${left} to go.`);
   }
 
   function liftToTray(letter, msg) {
@@ -144,6 +182,8 @@
     orient[letter] = normalize(idxs.map(rcOf));      // keep the orientation it had on the board
     selected = letter;
     ghost = null;
+    boardVersion++;
+    winShown = false;
     say(msg || `${name(letter)} is back in your tray.`);
   }
 
@@ -151,9 +191,73 @@
     if (!history.length) return;
     placed = history.pop();
     ghost = null;
+    boardVersion++;
+    winShown = false;
     if (selected && !inTray().includes(selected)) selected = null;
     say('Undone.');
     render();
+  }
+
+  /* ---------- Hint, Check and winning ---------- */
+  function setBusy(on, msg) {
+    busy = on;
+    if (msg) say(msg);
+    render();
+  }
+
+  async function runHint() {
+    if (busy) return;
+    if (isFull()) { say('The board is already full.'); return; }
+    const v = boardVersion;
+    setBusy(true, 'Finding a hint…');
+    const h = await ask('hint', occupancy(), puzzle.solution);
+    setBusy(false);
+    if (v !== boardVersion) { say('The board changed while I was looking. Tap Hint again.'); return; }
+    if (!h) {
+      say("No hint: this board can't be finished as it is. Undo or move one of your stones first.");
+      flashBoard('bad');
+      return;
+    }
+    hintsUsed++;
+    place(h.letter, h.idxs, 'hint');
+    render();
+    flashCells(h.idxs);
+  }
+
+  async function runCheck() {
+    if (busy) return;
+    if (isFull()) { say('Solved already. Every stone is in.'); return; }
+    const v = boardVersion;
+    setBusy(true, 'Checking…');
+    const r = await ask('check', occupancy());
+    setBusy(false);
+    if (v !== boardVersion) { say('The board changed while I was checking. Tap Check again.'); return; }
+    if (r.solvable) { say('Still solvable. Keep going!'); flashBoard('good'); }
+    else { say("Stuck: this board can't be finished. One of your stones needs to move."); flashBoard('bad'); }
+  }
+
+  function win() {
+    winShown = true;
+    const h = hintsUsed;
+    $('pp-winline').textContent = h === 0 ? 'Solved without any hints.' : `Solved with ${h} hint${h === 1 ? '' : 's'}.`;
+    say('');
+    cheer();
+  }
+
+  // Short-lived classes for the animations (they do nothing when the device asks for reduced motion).
+  function pulseClass(el, cls, ms) {
+    el.classList.remove(cls);
+    void el.offsetWidth;               // restart the animation if it's already running
+    el.classList.add(cls);
+    clearTimeout(el['_t' + cls]);
+    el['_t' + cls] = setTimeout(() => el.classList.remove(cls), ms);
+  }
+  const woodEl = document.querySelector('.pp-wood');
+  const flashBoard = kind => pulseClass(woodEl, kind === 'good' ? 'flash-good' : 'flash-bad', 950);
+  const flashCells = idxs => idxs.forEach(i => pulseClass(cells[i], 'hinted', 1500));
+  function cheer() {
+    cells.forEach((el, i) => el.style.setProperty('--delay', ((i % COLS) * 40 + ((i / COLS) | 0) * 25) + 'ms'));
+    pulseClass(boardEl, 'cheering', 1300);
   }
 
   function turn(how) {
@@ -179,6 +283,9 @@
     orient = Object.fromEntries(LETTERS.map(l => [l, normalize(PIECES[l].cells)]));
     selected = null;
     ghost = null;
+    hintsUsed = 0;
+    winShown = false;
+    boardVersion++;
     say('Drag a stone onto the board, or tap one and then tap where it goes.');
     render();
     popIn();
@@ -242,6 +349,12 @@
       b.appendChild(cluster(l));
       trayEl.appendChild(b);
     }
+    if (!trayEl.children.length) {
+      const note = document.createElement('p');
+      note.className = 'pp-traynote';
+      note.textContent = 'All your stones are on the board.';
+      trayEl.appendChild(note);
+    }
     $('pp-selname').textContent = selected ? name(selected) : '';
   }
 
@@ -251,6 +364,12 @@
     const onBoard = new Set(puzzle.start.filter(Boolean)).size + placed.size;
     $('pp-count').textContent = `${onBoard}/12`;
     $('pp-undo').disabled = history.length === 0;
+    const full = onBoard === 12;
+    $('pp-rotate').disabled = $('pp-flip').disabled = !selected && !drag;
+    $('pp-hint').disabled = busy || full;
+    $('pp-check').disabled = busy || full;
+    $('pp-win').hidden = !(full && winShown);
+    statusEl.hidden = full && winShown;              // the card takes the message line's place
   }
 
   // Stones bounce in, sweeping left to right, whenever a new puzzle appears.
@@ -427,9 +546,14 @@
   $('pp-rotate').addEventListener('click', () => turn('rotate'));
   $('pp-flip').addEventListener('click', () => turn('flip'));
   $('pp-undo').addEventListener('click', undo);
-  for (const id of ['pp-hint', 'pp-check']) {
-    $(id).addEventListener('click', () => say('Hint and Check arrive in the next step.'));
-  }
+  $('pp-hint').addEventListener('click', runHint);
+  $('pp-check').addEventListener('click', runCheck);
+  $('pp-win-new').addEventListener('click', newPuzzle);
+  $('pp-win-close').addEventListener('click', () => {
+    winShown = false;
+    say('Solved! Start a new puzzle whenever you like.');
+    render();
+  });
   startInput.addEventListener('input', () => { $('pp-startval').textContent = startInput.value; });
   $('pp-new').addEventListener('click', newPuzzle);
 

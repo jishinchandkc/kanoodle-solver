@@ -54,6 +54,17 @@ test('isolated hole is reported unsolvable', () => {
   [1, 11, 12, 13, 23].forEach(i => b[i] = 'L');
   assert(!E.solve(b).ok);
 });
+test('a sealed-off gap no set of pieces can fill is stuck without searching', () => {
+  // Seal off rows 0-1, columns 0-2 (a 6-hole gap). Pieces come in sizes 3, 4 and 5, with only
+  // one 3, so no combination makes 6.
+  const w = Array(N).fill(null);
+  [3, 14, 25, 24, 23].forEach(i => w[i] = 'G');        // L-shape: column 3 rows 0-2, row 2 columns 1-3
+  [22, 33, 34].forEach(i => w[i] = 'F');               // small L: (2,0), (3,0), (3,1)
+  assert(E.invalidPieces(w).length === 0, 'test setup: walls must be real piece shapes');
+  const r = E.solve(w);
+  assert(!r.ok, 'should be stuck');
+  assert(r.nodes === 0, `searched ${r.nodes} placements; expected an instant answer`);
+});
 test('wrongly shaped piece is detected', () => {
   const b = Array(N).fill(null);
   [0, 1, 2, 3].forEach(i => b[i] = 'A');

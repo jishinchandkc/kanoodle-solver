@@ -101,6 +101,23 @@
   }
 
   /* ---------- solver ---------- */
+  // FILLABLE[usedMask][size] = 1 when some combination of the pieces NOT in usedMask adds up to
+  // exactly `size` cells. A sealed-off gap whose size isn't fillable can never be completed.
+  // Built lazily: at most 4096 masks x 56 sizes.
+  const SIZES = LETTERS.map(l => PIECES[l].cells.length);
+  const FILLABLE = new Array(1 << LETTERS.length);
+  function fillable(used) {
+    let f = FILLABLE[used];
+    if (f) return f;
+    f = new Uint8Array(N + 1);
+    f[0] = 1;
+    for (let p = 0; p < LETTERS.length; p++) {
+      if (used & (1 << p)) continue;
+      for (let s = N; s >= SIZES[p]; s--) if (f[s - SIZES[p]]) f[s] = 1;   // 0/1 knapsack
+    }
+    return (FILLABLE[used] = f);
+  }
+
   // board: array of N entries, each a piece letter or null.
   // opts.rng: shuffle the search order to get varied solutions.
   // opts.nodeLimit: give up after this many placements (returns {ok:false, limit:true}).
@@ -118,8 +135,9 @@
     const seen = new Uint8Array(N);
     const stack = new Int32Array(N);
 
-    // Prune: an empty region smaller than 3 cells can never be filled (smallest piece is 3).
-    function hasDeadRegion(lo, hi) {
+    // Prune: every sealed-off empty region must be exactly fillable by the pieces still unused.
+    function hasDeadRegion(lo, hi, used) {
+      const fits = fillable(used);
       seen.fill(0);
       for (let s = 0; s < N; s++) {
         const filled = s < 27 ? (lo >>> s) & 1 : (hi >>> (s - 27)) & 1;
@@ -133,7 +151,7 @@
             if (!f && !seen[j]) { seen[j] = 1; stack[sp++] = j; }
           }
         }
-        if (size < 3) return true;
+        if (!fits[size]) return true;
       }
       return false;
     }
@@ -149,8 +167,8 @@
         if (used & (1 << p.pi)) continue;
         if ((lo & p.lo) | (hi & p.hi)) continue;
         if (++nodes > nodeLimit) throw new Error('limit');
-        const nlo = lo | p.lo, nhi = hi | p.hi;
-        if (!hasDeadRegion(nlo, nhi) && step(nlo, nhi, used | (1 << p.pi), anchor + 1)) {
+        const nlo = lo | p.lo, nhi = hi | p.hi, nused = used | (1 << p.pi);
+        if (!hasDeadRegion(nlo, nhi, nused) && step(nlo, nhi, nused, anchor + 1)) {
           for (const i of p.idxs) out[i] = p.letter;
           return true;
         }
@@ -158,6 +176,7 @@
       return false;
     }
 
+    if (hasDeadRegion(lo0, hi0, used0)) return { ok: false, nodes };   // already hopeless before any search
     try {
       return step(lo0, hi0, used0, 0) ? { ok: true, board: out, nodes } : { ok: false, nodes };
     } catch (e) {
